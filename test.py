@@ -4,9 +4,11 @@ from data import CreateDataLoader
 from models import create_model
 from util.visualizer import save_images
 from util import html
+from datetime import datetime, date, time, timedelta
 
 
 if __name__ == '__main__':
+    print(datetime.now())
     opt = TestOptions().parse()
     # hard-code some parameters for test
     opt.num_threads = 1   # test code only supports num_threads = 1
@@ -35,6 +37,7 @@ if __name__ == '__main__':
         img_path = model.get_image_paths()
         if i % 5 == 0:
             print('processing (%04d)-th image... %s' % (i, img_path))
+        print(datetime.now())
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize)
     # save the website
     webpage.save()

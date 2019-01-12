@@ -1,7 +1,6 @@
 from .base_model import BaseModel
 from . import networks
 
-
 class TestModel(BaseModel):
     def name(self):
         return 'TestModel'
@@ -18,6 +17,7 @@ class TestModel(BaseModel):
 
     def initialize(self, opt):
         assert(not opt.isTrain)
+        
         BaseModel.initialize(self, opt)
 
         # specify the training losses you want to print out. The program will call base_model.get_current_losses
@@ -33,6 +33,7 @@ class TestModel(BaseModel):
         # assigns the model to self.netG_[suffix] so that it can be loaded
         # please see BaseModel.load_networks
         setattr(self, 'netG' + opt.model_suffix, self.netG)
+        
 
     def set_input(self, input):
         # we need to use single_dataset mode
