@@ -135,9 +135,8 @@ class CycleGANModel(BaseModel):
             self.fake_B_pool = ImagePool(opt.pool_size)
             # define loss functions
             self.criterionGAN = networks.GANLoss(use_lsgan=not opt.no_lsgan).to(self.device)
-            #self.criterionCycle = torch.nn.L1Loss()
-            self.criterionSSIM = SSIM(window_size=11, size_average=True)
-            #self.criterionIdt = torch.nn.L1Loss()
+            self.criterionCycle = torch.nn.L1Loss()
+            self.criterionIdt = torch.nn.L1Loss()
             self.criterionSSIM = SSIM(window_size=11, size_average=True)
             # initialize optimizers
             self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()),
@@ -206,6 +205,10 @@ class CycleGANModel(BaseModel):
         self.loss_cycle_A = self.criterionCycle(self.rec_A, self.real_A) * lambda_A
         # Backward cycle loss
         self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * lambda_B
+        # Forward cycle loss based on SSIM
+        self.loss_cycle_ssim_A = self.criterionSSIM(self.rec_A, self.real_A)
+        # Backward cycle loss based on SSIM
+        self.loss_cycle_ssim_B = self.criterionSSIM(self.rec_B, self.real_B)
         # combined loss
         self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B
         self.loss_G.backward()
