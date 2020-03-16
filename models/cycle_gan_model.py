@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 import numpy as numpy
-from match import exp
+from math import exp
 import itertools
 from util.image_pool import ImagePool
 from .base_model import BaseModel
