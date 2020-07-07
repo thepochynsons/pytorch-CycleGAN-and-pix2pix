@@ -6,7 +6,7 @@ if [[ $FILE != "aus2rus" ]]; then
 fi
 
 echo "Specified [$FILE]"
-URL=https://drive.google.com/file/d/1pEPi0Wmm9iVcE1BsiBpe2IdHGxFICvgR/view?usp=sharing
+URL='http://download1587.mediafire.com/hnqx5ly535bg/cudar2ah1d2g5t6/aus2rus.zip'
 ZIP_FILE=./datasets/$FILE.zip
 TARGET_DIR=./datasets/$FILE/
 wget -N $URL -O $ZIP_FILE
