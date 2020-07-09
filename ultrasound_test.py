@@ -38,7 +38,7 @@ if __name__ == '__main__':
     cyclegan.eval()
     
     # -------------------------------------
-    #      set up directories and model
+    #      set up directories and generator model
     # -------------------------------------      
     
     # Collect the filenames of test-set and select correct generator
@@ -46,12 +46,12 @@ if __name__ == '__main__':
     if (opt.direction == 'AtoB'):
         test_data_dir = path.join(opt.dataroot,'testA')
         test_data_filenames = listdir(test_data_dir)
-        current_generator =  cyclegan.netG_a
+        current_generator =  cyclegan.netG_A
     # Translate BtoA
     else:
         test_data_dir = path.join(opt.dataroot,'testB')
         test_data_filenames = listdir(test_data_dir)
-        current_generator =  cyclegan.netG_b
+        current_generator =  cyclegan.netG_B
     
     # Make results directory
     makedirs(opt.results_dir, exist_ok=True)
