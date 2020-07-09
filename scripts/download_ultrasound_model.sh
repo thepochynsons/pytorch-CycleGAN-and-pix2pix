@@ -4,7 +4,7 @@ echo "available model is aus2rus"
 
 echo "Specified [$FILE]"
 
-URL='http://download946.mediafire.com/qgregdiu7phg/4n1a535e77pcsdi/kaggle.zip'
+URL='set'
 ZIP_FILE=./checkpoints/$FILE.zip
 TARGET_DIR=./checkpoints/$FILE/
 wget -N $URL -O $ZIP_FILE
