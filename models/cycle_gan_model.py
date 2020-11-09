@@ -3,6 +3,9 @@ import itertools
 from util.image_pool import ImagePool
 from .base_model import BaseModel
 from . import networks
+from configparser import ConfigParser
+from os import path
+from segm_net.learning.architectures.model_factory import ModelFactory
 
 
 class CycleGANModel(BaseModel):
@@ -36,7 +39,7 @@ class CycleGANModel(BaseModel):
             parser.add_argument('--lambda_aus', type=float, default=10.0, help='weight for cycle loss (aus -> rus -> aus)')
             parser.add_argument('--lambda_rus', type=float, default=10.0, help='weight for cycle loss (rus -> aus -> rus)')
             parser.add_argument('--lambda_identity', type=float, default=0.5, help='use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1')
-
+            parser.add_argument('--lambda_S', type=float, default=1, help='weight for segmentation loss. 0 to skip it' )
         return parser
 
     def __init__(self, opt):
@@ -46,13 +49,16 @@ class CycleGANModel(BaseModel):
         """
         BaseModel.__init__(self, opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        self.loss_names = ['D_aus', 'G_aus', 'cycle_aus', 'idt_aus', 'D_rus', 'G_rus', 'cycle_rus', 'idt_rus']
+        self.loss_names = ['D_aus', 'G_aus', 'cycle_aus', 'idt_aus', 'D_rus', 'G_rus', 'cycle_rus', 'idt_rus','segmentation']
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         visual_names_aus = ['real_aus', 'fake_rus', 'rec_aus']
         visual_names_rus = ['real_rus', 'fake_aus', 'rec_rus']
         if self.isTrain and self.opt.lambda_identity > 0.0:  # if identity loss is used, we also visualize idt_rus=G_aus(rus) ad idt_aus=G_aus(rus)
             visual_names_aus.append('idt_rus')
             visual_names_rus.append('idt_aus')
+        if self.isTrain and self.opt.lambda_S > 0.0:
+            visual_names_aus.append('aus_scores')
+            visual_names_rus.append('cycle_aus_scores')
 
         self.visual_names = visual_names_aus + visual_names_rus  # combine visualizations for aus and rus
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>.
@@ -73,6 +79,18 @@ class CycleGANModel(BaseModel):
                                             opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
             self.netD_rus = networks.define_D(opt.input_nc, opt.ndf, opt.netD,
                                             opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+        
+        # load segmenter
+
+        if self.isTrain and self.opt.lambda_S > 0.0:
+            # read the configuration file
+            segmenter_config = ConfigParser()
+            segmenter_config.read(opt.segmenter_config)
+            segmenter_path = path.join(segmenter_config['data']['output-folder'], segmenter_config['experiment']['name'], 'checkpoints')
+            netS_checkpoint = torch.load(path.join(segmenter_path, 'best_model.pt'))
+            self.netS = ModelFactory.get_model(segmenter_config)
+            self.netS.load_state_dict(netS_checkpoint['model'])
+            self.netS.cuda()
 
         if self.isTrain:
             if opt.lambda_identity > 0.0:  # only works when input and output images have the same number of channels
@@ -83,6 +101,8 @@ class CycleGANModel(BaseModel):
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)  # define GAN loss.
             self.criterionCycle = torch.nn.L1Loss()
             self.criterionIdt = torch.nn.L1Loss()
+            #santi - ver el tema de los pesos (por ahora no importa)
+            self.criterionSegm = torch.nn.CrossEntropyLoss()
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_aus.parameters(), self.netG_rus.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD_aus.parameters(), self.netD_rus.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -96,9 +116,9 @@ class CycleGANModel(BaseModel):
         The option 'direction' can be used to swap domain A and domain B.
         """
         austorus = self.opt.direction == 'austorus'
-        self.real_aus = input['aus' if austorus else 'rus'].to(self.device)
-        self.real_rus = input['rus' if austorus else 'aus'].to(self.device)
-        self.image_paths = input['aus_paths' if austorus else 'rus_paths']
+        self.real_aus = input['A' if austorus else 'B'].to(self.device)
+        self.real_rus = input['B' if austorus else 'A'].to(self.device)
+        self.image_paths = input['A_paths' if austorus else 'B_paths']
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -142,6 +162,7 @@ class CycleGANModel(BaseModel):
         lambda_idt = self.opt.lambda_identity
         lambda_aus = self.opt.lambda_aus
         lambda_rus = self.opt.lambda_rus
+        lambda_S = self.opt.lambda_S
         # Identity loss
         if lambda_idt > 0:
             # G_aus should be identity if real_rus is fed: ||G_aus(rus) - rus||
@@ -162,6 +183,18 @@ class CycleGANModel(BaseModel):
         self.loss_cycle_aus = self.criterionCycle(self.rec_aus, self.real_aus) * lambda_aus
         # Backward cycle loss || G_aus(G_rus(rus)) - rus||
         self.loss_cycle_rus = self.criterionCycle(self.rec_rus, self.real_rus) * lambda_rus
+        # segmentation loss - if lambda_S is not 0, multiply segmentation loss by it. 
+        if lambda_S > 0:
+            self.netS.eval()
+            # print specific weights. primera dimension de la primera capa conv del primer bloque unet (conv1) 
+            #print (self.netS.conv1.conv1[0].weight[0])
+            self.cycle_aus_scores = self.netS(self.rec_aus)
+            self.aus_scores = self.netS(self.real_aus)
+            _,aus_segmentation = torch.max(self.aus_scores, dim=1)
+            self.loss_segmentation = self.criterionSegm(self.cycle_aus_scores, aus_segmentation) * lambda_S
+        else:
+            self.loss_segmentation = 0
+                       
         # combined loss and calculate gradients
         self.loss_G = self.loss_G_aus + self.loss_G_rus + self.loss_cycle_aus + self.loss_cycle_rus + self.loss_idt_aus + self.loss_idt_rus
         self.loss_G.backward()

@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from PIL import Image
 import os
-
+from segm_net.util import string_to_list, parse_boolean, segmentation_to_colors, remove_labels_from_segmentation,recover_all_classes
 
 def tensor2im(input_image, imtype=np.uint8):
     """"Converts a Tensor array into a numpy image array.
@@ -19,9 +19,24 @@ def tensor2im(input_image, imtype=np.uint8):
         else:
             return input_image
         image_numpy = image_tensor[0].cpu().float().numpy()  # convert it into a numpy array
-        if image_numpy.shape[0] == 1:  # grayscale to RGB
-            image_numpy = np.tile(image_numpy, (3, 1, 1))
-        image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0  # post-processing: tranpose and scaling
+        # Vizualizar segmentaciones de Santi
+        if image_numpy.shape[0] > 3:
+            ### Para pintar las segmentaciones ### 
+            class_names = ['background', 'artery', 'gallbladder', 'kidney', 'liver', 'spleen']
+            num_classes = len(class_names)
+            # and get the new numbers for the comparison
+            new_class_nums = np.arange(0, num_classes)
+            # and all the class names
+            dic_keys = ['background', 'bones', 'artery', 'pancreas', 'gallbladder', 'kidney', 'surrenalGland', 'liver', 'spleen']
+            all_classes = dict(zip(dic_keys, np.arange(0, len(dic_keys))))
+            #############################
+            image_numpy =np.argmax(image_numpy, axis=0)
+            image_numpy = segmentation_to_colors(recover_all_classes(image_numpy, all_classes, class_names, new_class_nums))
+            image_numpy = np.transpose(image_numpy, (1,2,0))
+        else:
+            if image_numpy.shape[0] == 1:  # grayscale to RGB
+                image_numpy = np.tile(image_numpy, (3, 1, 1))
+            image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0  # post-processing: tranpose and scaling
     else:  # if it is a numpy array, do nothing
         image_numpy = input_image
     return image_numpy.astype(imtype)

@@ -42,16 +42,16 @@ if __name__ == '__main__':
     # -------------------------------------      
     
     # Collect the filenames of test-set and select correct generator
-    # Translate AtoB 
-    if (opt.direction == 'AtoB'):
+    # Translate austorus 
+    if (opt.direction == 'austorus'):
         test_data_dir = path.join(opt.dataroot,'testA')
         test_data_filenames = listdir(test_data_dir)
-        current_generator =  cyclegan.netG_A
-    # Translate BtoA
+        current_generator =  cyclegan.netG_aus
+    # Translate rustoaus
     else:
         test_data_dir = path.join(opt.dataroot,'testB')
         test_data_filenames = listdir(test_data_dir)
-        current_generator =  cyclegan.netG_B
+        current_generator =  cyclegan.netG_rus
     
     # Make results directory
     makedirs(opt.results_dir, exist_ok=True)
@@ -69,6 +69,7 @@ if __name__ == '__main__':
         # Load and set imagen 
         image = Image.open(path.join(test_data_dir, filename)).convert('RGB')
         image = transformation(image)
+        #Agrego el batchsize de 1
         image = torch.unsqueeze(image, dim=0)
         image = image.cuda()
        
